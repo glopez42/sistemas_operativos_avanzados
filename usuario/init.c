@@ -1,22 +1,22 @@
 /*
  * usuario/init.c
  *
- *  Minikernel. Versión 1.0
+ *  Minikernel. Versiï¿½n 1.0
  *
- *  Fernando Pérez Costoya
+ *  Fernando Pï¿½rez Costoya
  *
  */
 
-/* Programa inicial que arranca el S.O. Sólo se ejecutarán los programas
-   que se incluyan aquí, que, evidentemente, pueden ejecutar otros
+/* Programa inicial que arranca el S.O. Sï¿½lo se ejecutarï¿½n los programas
+   que se incluyan aquï¿½, que, evidentemente, pueden ejecutar otros
    programas...
 */
 
 /*
  *
- * Contiene las mismas pruebas que se realizan para evaluar la práctica.
+ * Contiene las mismas pruebas que se realizan para evaluar la prï¿½ctica.
  * Para llevar a cabo cada prueba, comente y descomente
- * las líneas correspondientes. En la versión inicial, la parte descomentada
+ * las lï¿½neas correspondientes. En la versiï¿½n inicial, la parte descomentada
  * se corresponde con funcionalidad ya implementada en el material de apoyo.
  *
  */
@@ -45,14 +45,14 @@ ALGO COMENTE ESTA PARTE Y DESCOMENTE LA PRUEBA CORRESPONDIENTE */
 
 /* FIN PRUEBA INICIAL */
 
-/* PRUEBA DE LA LLAMADA OBTENER_ID_PR
+/* PRUEBA DE LA LLAMADA OBTENER_ID_PR*/
 {
         int i;
         for (i=1; i<=2; i++)
                 if (crear_proceso("yosoy")<0)
                         printf("Error creando yosoy\n");
 }
-*/
+/**/
 
 /* PRUEBA DE LA LLAMADA DORMIR
 	if (crear_proceso("prueba_dormir")<0)

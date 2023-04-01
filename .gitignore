@@ -1,2 +1,16 @@
 *.o
 .vscode
+boot
+kernel
+excep_arit
+excep_mem
+init
+prueba_dormir
+prueba_mutex1
+prueba_RR1
+prueba_RR2
+prueba_term
+simplon
+libserv.a
+mudo
+yosoy

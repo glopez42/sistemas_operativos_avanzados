@@ -345,6 +345,12 @@ int sis_terminar_proceso()
 	return 0; /* no deber�a llegar aqui */
 }
 
+/* Rutina que devuelve el ID del proceso */
+int obtener_id_pr()
+{
+	return p_proc_actual->id;
+}
+
 /*
  *
  * Rutina de inicializaci�n invocada en arranque
