@@ -88,7 +88,7 @@ typedef struct
 int sis_crear_proceso();
 int sis_terminar_proceso();
 int sis_escribir();
-int obtener_id_pr();
+int sis_obtener_id_pr();
 
 /*
  * Variable global que contiene las rutinas que realizan cada llamada
@@ -96,7 +96,7 @@ int obtener_id_pr();
 servicio tabla_servicios[NSERVICIOS] = {{sis_crear_proceso},
 										{sis_terminar_proceso},
 										{sis_escribir},
-										{obtener_id_pr}
+										{sis_obtener_id_pr}
 										};
 
 #endif /* _KERNEL_H */
