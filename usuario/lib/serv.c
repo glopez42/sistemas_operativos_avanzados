@@ -48,3 +48,7 @@ int obtener_id_pr()
 {
    return llamsis(OBTENER_ID, 0);
 }
+int dormir(unsigned int s)
+{
+   return llamsis(DORMIR, 1, (long)s);
+}
