@@ -146,10 +146,7 @@ static void liberar_proceso()
 	liberar_imagen(p_proc_actual->info_mem); /* liberar mapa */
 
 	p_proc_actual->estado = TERMINADO;
-
-	nivel_previo = fijar_nivel_int(NIVEL_3);
 	eliminar_primero(&lista_listos); /* proc. fuera de listos */
-	fijar_nivel_int(nivel_previo);
 
 	/* Realizar cambio de contexto */
 	p_proc_anterior = p_proc_actual;
@@ -222,6 +219,7 @@ static void int_terminal()
  */
 static void int_reloj()
 {
+	int nivel_previo;
 	printk("-> TRATANDO INT. DE RELOJ\n");
 
 	// recorremos la lista de procesos bloqueados
@@ -235,11 +233,12 @@ static void int_reloj()
 		{
 			proc_bloqueado->estado = LISTO;
 
+			nivel_previo = fijar_nivel_int(NIVEL_3);
 			// eliminamos al proceso de la lista de bloqueados
 			eliminar_elem(&lista_bloq, proc_bloqueado);
 			// lo añadimos a la lista de listos
 			insertar_ultimo(&lista_listos, proc_bloqueado);
-
+			fijar_nivel_int(nivel_previo);
 		}
 		proc_bloqueado = proc_bloqueado->siguiente;
 	}
@@ -382,7 +381,7 @@ int sis_dormir()
 {
 	unsigned int segundos;
 	int nivel_previo;
-	BCP * proc_a_dormir;
+	BCP *proc_a_dormir;
 	segundos = (unsigned int)leer_registro(1);
 
 	// indicamos ticks iniciales de bloqueo
@@ -399,7 +398,7 @@ int sis_dormir()
 	// insertamos proceso bloqueado en la lista pertinente
 	insertar_ultimo(&lista_bloq, p_proc_actual);
 
-	//volvemos al nivel anterior
+	// volvemos al nivel anterior
 	fijar_nivel_int(nivel_previo);
 
 	// siguiente proceso
