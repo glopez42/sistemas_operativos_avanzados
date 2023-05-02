@@ -141,7 +141,6 @@ static BCP *planificador()
 static void liberar_proceso()
 {
 	BCP *p_proc_anterior;
-	int nivel_previo;
 
 	liberar_imagen(p_proc_actual->info_mem); /* liberar mapa */
 
@@ -219,11 +218,11 @@ static void int_terminal()
  */
 static void int_reloj()
 {
-	int nivel_previo;
 	printk("-> TRATANDO INT. DE RELOJ\n");
 
 	// recorremos la lista de procesos bloqueados
 	BCP *proc_bloqueado = lista_bloq.primero;
+	BCP *aux_siguiente;
 	while (proc_bloqueado != NULL)
 	{
 		// quitamos un tick del contador
@@ -232,15 +231,20 @@ static void int_reloj()
 		if (proc_bloqueado->ticks_bloq == 0)
 		{
 			proc_bloqueado->estado = LISTO;
-
-			nivel_previo = fijar_nivel_int(NIVEL_3);
+			// guardamos la referencia al siguiente antes de eliminar el actual de la lista
+			aux_siguiente = proc_bloqueado->siguiente;
 			// eliminamos al proceso de la lista de bloqueados
 			eliminar_elem(&lista_bloq, proc_bloqueado);
 			// lo añadimos a la lista de listos
 			insertar_ultimo(&lista_listos, proc_bloqueado);
-			fijar_nivel_int(nivel_previo);
+			// tomamos el siguiente proceso
+			proc_bloqueado = aux_siguiente;
 		}
-		proc_bloqueado = proc_bloqueado->siguiente;
+		else
+		{
+			// si no cogemos el siguiente
+			proc_bloqueado = proc_bloqueado->siguiente;
+		}
 	}
 
 	return;
