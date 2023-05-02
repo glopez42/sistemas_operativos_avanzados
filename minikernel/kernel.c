@@ -222,7 +222,6 @@ static void int_terminal()
  */
 static void int_reloj()
 {
-	int nivel_previo;
 	printk("-> TRATANDO INT. DE RELOJ\n");
 
 	// recorremos la lista de procesos bloqueados
@@ -234,12 +233,10 @@ static void int_reloj()
 		{
 			proc_bloqueado->estado = LISTO;
 
-			nivel_previo = fijar_nivel_int(NIVEL_3);
 			// eliminamos al proceso de la lista de bloqueados
 			eliminar_elem(&lista_bloq, proc_bloqueado);
 			// lo añadimos a la lista de listos
 			insertar_ultimo(&lista_listos, proc_bloqueado);
-			fijar_nivel_int(nivel_previo);
 
 		}
 		else
@@ -388,11 +385,13 @@ int sis_dormir()
 {
 	unsigned int segundos;
 	int nivel_previo;
+	BCP * proc_a_dormir;
 	segundos = (unsigned int)leer_registro(1);
 
 	// indicamos ticks iniciales de bloqueo
 	p_proc_actual->ticks_bloq = segundos * TICK;
 	p_proc_actual->estado = BLOQUEADO;
+	proc_a_dormir = p_proc_actual;
 
 	// inhabilitamos todas las interrupciones
 	nivel_previo = fijar_nivel_int(NIVEL_3);
@@ -408,7 +407,7 @@ int sis_dormir()
 
 	// siguiente proceso
 	p_proc_actual = planificador();
-	cambio_contexto(NULL, &p_proc_actual->contexto_regs);
+	cambio_contexto(&proc_a_dormir->contexto_regs, &p_proc_actual->contexto_regs);
 	return 0;
 }
 
