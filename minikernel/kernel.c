@@ -228,6 +228,8 @@ static void int_reloj()
 	BCP *proc_bloqueado = lista_bloq.primero;
 	while (proc_bloqueado != NULL)
 	{
+		// quitamos un tick del contador
+		proc_bloqueado->ticks_bloq -= 1;
 		// si el proceso no tiene que seguir bloqueado más ticks
 		if (proc_bloqueado->ticks_bloq == 0)
 		{
@@ -238,11 +240,6 @@ static void int_reloj()
 			// lo añadimos a la lista de listos
 			insertar_ultimo(&lista_listos, proc_bloqueado);
 
-		}
-		else
-		{
-			// si no, un tick menos
-			proc_bloqueado->ticks_bloq -= 1;
 		}
 		proc_bloqueado = proc_bloqueado->siguiente;
 	}
@@ -389,7 +386,7 @@ int sis_dormir()
 	segundos = (unsigned int)leer_registro(1);
 
 	// indicamos ticks iniciales de bloqueo
-	p_proc_actual->ticks_bloq = segundos * TICK;
+	p_proc_actual->ticks_bloq = (segundos * TICK);
 	p_proc_actual->estado = BLOQUEADO;
 	proc_a_dormir = p_proc_actual;
 
