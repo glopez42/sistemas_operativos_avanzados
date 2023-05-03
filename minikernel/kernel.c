@@ -141,12 +141,15 @@ static BCP *planificador()
 static void liberar_proceso()
 {
 	BCP *p_proc_anterior;
+	int nivel_previo;
 
 	liberar_imagen(p_proc_actual->info_mem); /* liberar mapa */
 
 	p_proc_actual->estado = TERMINADO;
+	nivel_previo = fijar_nivel_int(NIVEL_3);
 	eliminar_primero(&lista_listos); /* proc. fuera de listos */
-
+	fijar_nivel_int(nivel_previo);
+	
 	/* Realizar cambio de contexto */
 	p_proc_anterior = p_proc_actual;
 	p_proc_actual = planificador();
