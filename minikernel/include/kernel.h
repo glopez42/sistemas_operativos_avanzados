@@ -39,6 +39,8 @@ typedef struct BCP_t
 	BCPptr siguiente;		  /* puntero a otro BCP */
 	void *info_mem;			  /* descriptor del mapa de memoria */
 	int ticks_bloq;		  	  /* ticks que le quedan para desbloquearse en el caso de que lo este*/
+	int int_usuario;		  /* veces que ha habido interrupcion de reloj en modo usuario*/
+	int int_sistema;          /* veces que ha habido interrupcion de reloj en modo sistema*/
 } BCP;
 
 /*
@@ -78,6 +80,18 @@ lista_BCPs lista_listos = {NULL, NULL};
 lista_BCPs lista_bloq = {NULL, NULL};
 
 /*
+ * Variable global que guarda el numero de interrupciones de reloj totales
+*/
+
+long num_ints = 0; 
+
+/**
+ *  Variable global que registra si se esta accediendo a la zona de usuario
+*/
+
+int acceso_parametro = 0;
+
+/*
  *
  * Definici�n del tipo que corresponde con una entrada en la tabla de
  * llamadas al sistema.
@@ -88,6 +102,15 @@ typedef struct
 	int (*fservicio)();
 } servicio;
 
+
+/**
+ *  Struct para guardar el numero de veces que se ha interrumpido un proceso en modo sistema o usuario
+*/
+typedef struct tiempos_ejec_t {
+    int usuario;
+    int sistema;
+} tiempos_ejec;
+
 /*
  * Prototipos de las rutinas que realizan cada llamada al sistema
  */
@@ -96,6 +119,7 @@ int sis_terminar_proceso();
 int sis_escribir();
 int sis_obtener_id_pr();
 int sis_dormir();
+int sis_tiempos_proceso();
 
 /*
  * Variable global que contiene las rutinas que realizan cada llamada
@@ -105,6 +129,7 @@ servicio tabla_servicios[NSERVICIOS] = {
 	{sis_terminar_proceso},
 	{sis_escribir},
 	{sis_obtener_id_pr},
-	{sis_dormir}};
+	{sis_dormir},
+	{sis_tiempos_proceso}};
 
 #endif /* _KERNEL_H */

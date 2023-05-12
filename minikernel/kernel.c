@@ -149,7 +149,7 @@ static void liberar_proceso()
 	nivel_previo = fijar_nivel_int(NIVEL_3);
 	eliminar_primero(&lista_listos); /* proc. fuera de listos */
 	fijar_nivel_int(nivel_previo);
-	
+
 	/* Realizar cambio de contexto */
 	p_proc_anterior = p_proc_actual;
 	p_proc_actual = planificador();
@@ -193,8 +193,8 @@ static void exc_arit()
  */
 static void exc_mem()
 {
-
-	if (!viene_de_modo_usuario())
+	// si hay una excepcion en modo sistema y no se estaba accediendo a un parametro de usuario
+	if (!viene_de_modo_usuario() && acceso_parametro == 0)
 		panico("excepcion de memoria cuando estaba dentro del kernel");
 
 	printk("-> EXCEPCION DE MEMORIA EN PROC %d\n", p_proc_actual->id);
@@ -221,7 +221,20 @@ static void int_terminal()
  */
 static void int_reloj()
 {
+	num_ints += 1;
 	printk("-> TRATANDO INT. DE RELOJ\n");
+
+	// contabilizamos si ha ocurrido en modo usuario o modo sistema, siempre que haya al menos un proceso listo
+	if (lista_listos.primero != NULL)
+	{
+		if (viene_de_modo_usuario())
+		{
+			p_proc_actual->int_usuario++;
+		} else {
+			p_proc_actual->int_sistema++;
+		}
+	}
+	
 
 	// recorremos la lista de procesos bloqueados
 	BCP *proc_bloqueado = lista_bloq.primero;
@@ -312,6 +325,8 @@ static int crear_tarea(char *prog)
 						   &(p_proc->contexto_regs));
 		p_proc->id = proc;
 		p_proc->estado = LISTO;
+		p_proc->int_sistema = 0;
+		p_proc->int_usuario = 0;
 
 		/* lo inserta al final de cola de listos */
 		nivel_previo = fijar_nivel_int(NIVEL_3);
@@ -413,6 +428,28 @@ int sis_dormir()
 	cambio_contexto(&proc_a_dormir->contexto_regs, &p_proc_actual->contexto_regs);
 	return 0;
 }
+
+/* Rutina que  contabiliza el uso del procesador por parte de un proceso */
+int sis_tiempos_proceso(){
+	struct tiempos_ejec_t * tiempos;
+	tiempos = (struct tiempos_ejec_t *) leer_registro(1);
+
+	if (tiempos != NULL)
+	{
+		// controlamos acceso por si hay excepción
+		acceso_parametro = 1;
+
+		tiempos->sistema = p_proc_actual->int_sistema;
+		tiempos->usuario = p_proc_actual->int_usuario;
+
+		acceso_parametro = 0;
+	}
+	
+	 
+	return num_ints;
+}
+
+
 
 /*
  *

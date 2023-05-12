@@ -52,3 +52,7 @@ int dormir(unsigned int s)
 {
    return llamsis(DORMIR, 1, (long)s);
 }
+int tiempos_proceso(struct tiempos_ejec *t_ejec)
+{
+   return llamsis(TIEMPOS_PROCESO, 1, (long)t_ejec);
+}
