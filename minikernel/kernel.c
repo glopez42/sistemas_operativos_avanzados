@@ -432,10 +432,13 @@ int sis_dormir()
 /* Rutina que  contabiliza el uso del procesador por parte de un proceso */
 int sis_tiempos_proceso(){
 	struct tiempos_ejec_t * tiempos;
+	int nivel_previo;
 	tiempos = (struct tiempos_ejec_t *) leer_registro(1);
 
 	if (tiempos != NULL)
 	{
+		// inhabilitamos todas las interrupciones
+		nivel_previo = fijar_nivel_int(NIVEL_3);
 		// controlamos acceso por si hay excepción
 		acceso_parametro = 1;
 
@@ -443,6 +446,9 @@ int sis_tiempos_proceso(){
 		tiempos->usuario = p_proc_actual->int_usuario;
 
 		acceso_parametro = 0;
+		// volvemos al nivel anterior
+		fijar_nivel_int(nivel_previo);
+		
 	}
 	
 	 
