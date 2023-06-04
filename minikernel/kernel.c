@@ -103,6 +103,144 @@ static void eliminar_elem(lista_BCPs *lista, BCP *proc)
 
 /*
  *
+ * Funciones relacionadas con la tabla de mutex:
+ *
+ */
+
+/*
+ * Funcion que inicia la tabla de mutex
+ */
+static void iniciar_tabla_mutex()
+{
+	int i;
+
+	for (i = 0; i < NUM_MUT; i++)
+	{
+		tabla_mutex[i].estado = SIN_USAR;
+	}
+
+	n_mutex_open = 0;
+}
+
+/*
+ * Funci�n que busca una entrada libre en la tabla de mutex
+ */
+static int buscar_mutex_libre()
+{
+	int i;
+
+	for (i = 0; i < NUM_MUT; i++)
+		if (tabla_mutex[i].estado == SIN_USAR)
+			return i;
+	return -1;
+}
+
+/*
+ * Funci�n que dado un nombre busca si ya existe
+ * Si existe se devuelve un numero positivo que indica su posicion.
+ * Si no, devuelve -1
+ */
+static int buscar_nombre_mutex(char *nombre)
+{
+	int i;
+
+	for (i = 0; i < NUM_MUT; i++)
+	{
+		if (tabla_mutex[i].estado != SIN_USAR && strcmp(tabla_mutex[i].nombre, nombre) == 0)
+			return i;
+	}
+	return -1;
+}
+
+// Rutina que busca si el proceso actual tiene abierto el mutex con identificador id
+int find_mutex_descrp(int id)
+{
+	int i;
+	for (i = 0; i < NUM_MUT_PROC; i++)
+	{
+		if (p_proc_actual->desc_mutex[i] == id)
+			return i;
+	}
+	return -1;
+}
+
+// Rutina que dado un proceso, devuelve el primer descriptor de mutex libre que tenga, -1 si no hay
+int get_free_mutex_descrp()
+{
+	return find_mutex_descrp(-1);
+}
+
+// Rutina que dado el id de un mutex busca si el proceso actual tiene abierto el mutex
+int get_open_mutex(int mutexid)
+{
+	int i;
+	for (i = 0; i < NUM_MUT_PROC; i++)
+	{
+		if (p_proc_actual->desc_mutex[i] == mutexid)
+			return i;
+	}
+	return -1;
+}
+
+// dada una lista desbloquea al primer proceso esperando y lo mete en la lista de listos
+void desbloquear_proc_esperando(lista_BCPs *lista_bloqueos)
+{
+	int nivel_previo;
+
+	BCP *proceso_desbloqueado = lista_bloqueos->primero;
+	if (proceso_desbloqueado != NULL)
+	{
+		nivel_previo = fijar_nivel_int(3);
+		proceso_desbloqueado->estado = LISTO;
+		// eliminamos al primer proceso esperando
+		eliminar_elem(lista_bloqueos, proceso_desbloqueado);
+		// insertamos proceso bloqueado en la lista de procesos esperando al mutex
+		insertar_ultimo(&lista_listos, proceso_desbloqueado);
+		fijar_nivel_int(nivel_previo);
+	}
+}
+
+// Funcion que libera todos los mutex del proceso actual
+void liberar_mutex()
+{
+	int i, descriptor;
+	mutex *mut;
+
+	for (i = 0; i < NUM_MUT_PROC; i++)
+	{
+		descriptor = p_proc_actual->desc_mutex[i];
+		// aquellos mutex que tenga abiertos se cierran
+		if (descriptor != -1)
+		{
+			mut = &tabla_mutex[descriptor];
+
+			p_proc_actual->desc_mutex[i] = -1;
+			// si el proceso actual tiene bloqueado el mutex
+			if (mut->owner == p_proc_actual->id && mut->estado == LOCKED)
+			{
+				mut->estado = UNLOCKED;
+				mut->n_blocks = 0; // cerramos todas las veces que se habia bloqueado por el proceso actual
+				// desbloqueamos procesos esperando por el mutex
+				desbloquear_proc_esperando(&mut->procesos_esperando);
+			}
+
+			mut->n_opens--;
+
+			// si no hay nadie con el mutex abierto se elimina definitivamente
+			if (mut->n_opens == 0)
+			{
+				tabla_mutex[descriptor].estado = SIN_USAR;
+				n_mutex_open--;
+
+				// desbloqueamos procesos esperando a crear un mutex si los habia
+				desbloquear_proc_esperando(&lista_bloq_mutex);
+			}
+		}
+	}
+}
+
+/*
+ *
  * Funciones relacionadas con la planificacion
  *	espera_int planificador
  */
@@ -143,6 +281,7 @@ static void liberar_proceso()
 	BCP *p_proc_anterior;
 	int nivel_previo;
 
+	liberar_mutex();						 // liberamos mutex
 	liberar_imagen(p_proc_actual->info_mem); /* liberar mapa */
 
 	p_proc_actual->estado = TERMINADO;
@@ -230,11 +369,12 @@ static void int_reloj()
 		if (viene_de_modo_usuario())
 		{
 			p_proc_actual->int_usuario++;
-		} else {
+		}
+		else
+		{
 			p_proc_actual->int_sistema++;
 		}
 	}
-	
 
 	// recorremos la lista de procesos bloqueados
 	BCP *proc_bloqueado = lista_bloq.primero;
@@ -306,6 +446,7 @@ static int crear_tarea(char *prog)
 	int proc;
 	BCP *p_proc;
 	int nivel_previo;
+	int i;
 
 	proc = buscar_BCP_libre();
 	if (proc == -1)
@@ -327,6 +468,10 @@ static int crear_tarea(char *prog)
 		p_proc->estado = LISTO;
 		p_proc->int_sistema = 0;
 		p_proc->int_usuario = 0;
+
+		// iniciamos tabla de descriptores de mutex a -1
+		for (i = 0; i < NUM_MUT_PROC; i++)
+			p_proc->desc_mutex[i] = -1;
 
 		/* lo inserta al final de cola de listos */
 		nivel_previo = fijar_nivel_int(NIVEL_3);
@@ -430,10 +575,11 @@ int sis_dormir()
 }
 
 /* Rutina que  contabiliza el uso del procesador por parte de un proceso */
-int sis_tiempos_proceso(){
-	struct tiempos_ejec_t * tiempos;
+int sis_tiempos_proceso()
+{
+	struct tiempos_ejec_t *tiempos;
 	int nivel_previo;
-	tiempos = (struct tiempos_ejec_t *) leer_registro(1);
+	tiempos = (struct tiempos_ejec_t *)leer_registro(1);
 
 	if (tiempos != NULL)
 	{
@@ -448,14 +594,283 @@ int sis_tiempos_proceso(){
 		acceso_parametro = 0;
 		// volvemos al nivel anterior
 		fijar_nivel_int(nivel_previo);
-		
 	}
-	
-	 
+
 	return num_ints;
 }
 
+/* Rutinas mutex */
 
+int sis_crear_mutex()
+{
+	char *nombre;
+	int tipo, pos, descriptor, nivel_previo, se_ha_bloqueado = 0;
+	BCP *proc_a_bloquear;
+
+	nombre = (char *)leer_registro(1);
+	tipo = (int)leer_registro(2);
+
+	// si se pasa del tamaño maximo se devuelve un error
+	if (strlen(nombre) > MAX_NOM_MUT)
+	{
+		printk("ERROR: nombre de mutex demaisado largo.\n");
+		return -1;
+	}
+
+	// miramos si al proceso actual le quedan descriptores de mutex libres
+	descriptor = get_free_mutex_descrp();
+	if (descriptor == -1)
+	{
+		printk("ERROR: proceso actual no tiene descriptores de mutex libres.\n");
+		return -1;
+	}
+
+	// si ya existe ese nombre en la tabla de mutex devuelve error
+	pos = buscar_nombre_mutex(nombre);
+	if (pos != -1)
+	{
+		printk("ERROR: nombre de Mutex %s en uso.\n", nombre);
+		return -1;
+	}
+
+	// si se ha alcanzado el numero maximo de mutex se bloquea hasta que se puedan crear mas
+	while (n_mutex_open >= NUM_MUT)
+	{
+		se_ha_bloqueado = 1;
+		printk("WARNING: proceso actual bloqueado, no se pueden hacer mas mutex.\n");
+		nivel_previo = fijar_nivel_int(3);
+
+		p_proc_actual->estado = BLOQUEADO;
+		proc_a_bloquear = p_proc_actual;
+		// sacamos el proceso actual de la lista de listos
+		eliminar_elem(&lista_listos, p_proc_actual);
+
+		// insertamos proceso bloqueado en la lista pertinente
+		insertar_ultimo(&lista_bloq_mutex, p_proc_actual);
+
+		fijar_nivel_int(nivel_previo);
+
+		// siguiente proceso
+		p_proc_actual = planificador();
+		cambio_contexto(&proc_a_bloquear->contexto_regs, &p_proc_actual->contexto_regs);
+	}
+
+	// si se ha bloqueado, hay que volver a comprobar si durante ese tiempo alguien ha creado un mutex con el mismo nombre
+	if (se_ha_bloqueado)
+	{
+		pos = buscar_nombre_mutex(nombre);
+		if (pos != -1)
+		{
+			printk("ERROR: nombre de Mutex en uso.\n");
+			return -1;
+		}
+	}
+
+	// se crea por fin el mutex en una posicion libre
+	pos = buscar_mutex_libre();
+	strcpy(tabla_mutex[pos].nombre, nombre);
+	tabla_mutex[pos].id = pos;
+	tabla_mutex[pos].tipo = tipo;
+	tabla_mutex[pos].estado = UNLOCKED;
+	tabla_mutex[pos].n_blocks = 0;
+	tabla_mutex[pos].procesos_esperando.primero = NULL;
+	tabla_mutex[pos].procesos_esperando.ultimo = NULL;
+	tabla_mutex[pos].n_opens = 1;
+	n_mutex_open++;
+
+	// le asignamos la posicion de la tabla al descriptor libre del proceso actual
+	p_proc_actual->desc_mutex[descriptor] = pos;
+
+	return descriptor;
+}
+
+int sis_abrir_mutex()
+{
+	int descr, mutexid;
+	char *nombre;
+
+	// miramos si al proceso actual le quedan descriptores de mutex libres
+	descr = get_free_mutex_descrp();
+	if (descr == -1)
+	{
+		printk("ERROR: proceso actual no tiene descriptores de mutex libres.\n");
+		return -1;
+	}
+
+	nombre = (char *)leer_registro(1);
+	mutexid = buscar_nombre_mutex(nombre);
+	if (mutexid == -1)
+	{
+		printk("ERROR: no existe mutex con ese nombre.\n");
+		return -1;
+	}
+
+	// se asocia el descriptor del proceso al mutex correspondiente
+	p_proc_actual->desc_mutex[descr] = mutexid;
+	tabla_mutex[mutexid].n_opens++;
+
+	return mutexid;
+}
+
+int sis_lock()
+{
+	unsigned int mutexid, found;
+	int nivel_previo;
+	mutex *mut;
+	BCP *proc_a_bloquear;
+	mutexid = (unsigned int)leer_registro(1);
+
+	// primero mira si el proceso ha abierto el mutex anteriormente
+	found = find_mutex_descrp(mutexid);
+	if (found == -1)
+	{
+		printk("ERROR: el proceso no ha abierto el mutex %d.\n", mutexid);
+		return -1;
+	}
+
+	// obtenemos la información del mutex
+	mut = &tabla_mutex[mutexid];
+
+	// miramos si esta libre el mutex
+	while (mut->estado == LOCKED)
+	{
+
+		// miramos si el proceso actual ya es propietario del mutex
+		if (mut->owner == p_proc_actual->id)
+		{
+			// comprobamos qua tipo de mutex es
+			if (mut->tipo == RECURSIVO)
+			{
+				mut->n_blocks++; // proceso vuelve a bloquear el mutex
+				return 0;
+			}
+			else
+			{
+				printk("ERROR: el proceso ya es propietario del mutex no recursivo %d.\n", mutexid);
+				return -1;
+			}
+		}
+		else // si no es propietario y no lo puede coger se bloquea el proceso
+		{
+			nivel_previo = fijar_nivel_int(3);
+
+			p_proc_actual->estado = BLOQUEADO;
+			proc_a_bloquear = p_proc_actual;
+			// sacamos el proceso actual de la lista de listos
+			eliminar_elem(&lista_listos, p_proc_actual);
+
+			// insertamos proceso bloqueado en la lista de procesos esperando al mutex
+			insertar_ultimo(&mut->procesos_esperando, p_proc_actual);
+
+			fijar_nivel_int(nivel_previo);
+
+			// siguiente proceso
+			p_proc_actual = planificador();
+			cambio_contexto(&proc_a_bloquear->contexto_regs, &p_proc_actual->contexto_regs);
+		}
+	}
+
+	// cuando este libre lo bloquea
+	mut->estado = LOCKED;
+	mut->owner = p_proc_actual->id;
+	mut->n_blocks++;
+	return 0;
+}
+
+int sis_unlock()
+{
+	unsigned int mutexid, found;
+	mutex *mut;
+	mutexid = (unsigned int)leer_registro(1);
+
+	// primero mira si el proceso ha abierto el mutex anteriormente
+	found = find_mutex_descrp(mutexid);
+	if (found == -1)
+	{
+		printk("ERROR: el proceso no ha abierto el mutex %d.\n", mutexid);
+		return -1;
+	}
+
+	// obtenemos la información del mutex
+	mut = &tabla_mutex[mutexid];
+
+	// comprueba que el mutex esta bloqueado
+	if (mut->estado != LOCKED)
+	{
+		printk("ERROR: el mutex %d no esta bloqueado.\n", mutexid);
+		return -1;
+	}
+
+	// comprueba que el proceso actual tiene bloqueado el mutex
+	if (mut->owner != p_proc_actual->id)
+	{
+		printk("ERROR: el mutex %d no esta bloqueado por el proceso actual.\n", mutexid);
+		return -1;
+	}
+
+	// restamos 1 al contador de bloqueos
+	mut->n_blocks--;
+
+	// si el proceso actual ha hecho el mismo nº de locks que unlocks
+	if (mut->n_blocks == 0)
+	{
+		mut->estado = UNLOCKED;
+		mut->owner = -1;
+
+		// desbloqueamos al primer proceso esperando por el mutex si lo hay
+		desbloquear_proc_esperando(&mut->procesos_esperando);
+	}
+
+	return 0;
+}
+
+int sis_cerrar_mutex()
+{
+	unsigned int mutexid;
+	int descpr;
+	mutex *mut;
+	mutexid = (unsigned int)leer_registro(1);
+
+	// primero mira si el proceso ha abierto el mutex anteriormente
+	descpr = find_mutex_descrp(mutexid);
+	if (descpr == -1)
+	{
+		printk("ERROR: el proceso no ha abierto el mutex %d.\n", mutexid);
+		return -1;
+	}
+
+	// obtenemos la información del mutex
+	mut = &tabla_mutex[mutexid];
+
+	// eliminamos y cerramos mutex de la lista de descriptores del proceso actual
+	while (descpr != -1)
+	{
+		p_proc_actual->desc_mutex[descpr] = -1;
+		mut->n_opens--;
+		descpr = find_mutex_descrp(mutexid);
+	}
+
+	// si ademas el proceso actual tiene bloqueado el mutex
+	if (mut->owner == p_proc_actual->id && mut->estado == LOCKED)
+	{
+		mut->estado = UNLOCKED;
+		mut->n_blocks = 0; // cerramos todas las veces que se habia bloqueado por el proceso actual
+		// desbloqueamos procesos esperando por el mutex
+		desbloquear_proc_esperando(&mut->procesos_esperando);
+	}
+
+	// si no hay nadie con el mutex abierto se elimina definitivamente
+	if (mut->n_opens == 0)
+	{
+		mut->estado = SIN_USAR;
+		n_mutex_open--;
+
+		// desbloqueamos procesos esperando a crear un mutex si los habia
+		desbloquear_proc_esperando(&lista_bloq_mutex);
+	}
+
+	return 0;
+}
 
 /*
  *
@@ -477,7 +892,8 @@ int main()
 	iniciar_cont_reloj(TICK); /* fija frecuencia del reloj */
 	iniciar_cont_teclado();	  /* inici cont. teclado */
 
-	iniciar_tabla_proc(); /* inicia BCPs de tabla de procesos */
+	iniciar_tabla_proc();  /* inicia BCPs de tabla de procesos */
+	iniciar_tabla_mutex(); /* inicia tabla de mutex del sistema */
 
 	/* crea proceso inicial */
 	if (crear_tarea((void *)"init") < 0)

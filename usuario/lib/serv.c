@@ -56,3 +56,26 @@ int tiempos_proceso(struct tiempos_ejec *t_ejec)
 {
    return llamsis(TIEMPOS_PROCESO, 1, (long)t_ejec);
 }
+int crear_mutex(char *nombre, int tipo)
+{
+   return llamsis(CREAR_MUTEX, 2, (long)nombre, (long)tipo);
+}
+int abrir_mutex(char *nombre)
+{
+   return llamsis(ABRIR_MUTEX, 1, (long)nombre);
+}
+
+int lock(unsigned int mutexid)
+{
+   return llamsis(LOCK, 1, (long)mutexid);
+}
+
+int unlock(unsigned int mutexid)
+{
+   return llamsis(UNLOCK, 1, (long)mutexid);
+}
+
+int cerrar_mutex(unsigned int mutexid)
+{
+   return llamsis(CERRAR_MUTEX, 1, (long)mutexid);
+}

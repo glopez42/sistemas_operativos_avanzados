@@ -21,6 +21,11 @@
 #include "const.h"
 #include "HAL.h"
 #include "llamsis.h"
+#include "string.h"
+
+/* Definicion tipos mutex*/
+#define RECURSIVO 0
+#define NO_RECURSIVO 1
 
 /*
  *
@@ -41,6 +46,7 @@ typedef struct BCP_t
 	int ticks_bloq;		  	  /* ticks que le quedan para desbloquearse en el caso de que lo este*/
 	int int_usuario;		  /* veces que ha habido interrupcion de reloj en modo usuario*/
 	int int_sistema;          /* veces que ha habido interrupcion de reloj en modo sistema*/
+	int desc_mutex[NUM_MUT_PROC]; /* lista con los descriptores de mutex del proceso, -1 por defecto en cada posicion */
 } BCP;
 
 /*
@@ -80,6 +86,11 @@ lista_BCPs lista_listos = {NULL, NULL};
 lista_BCPs lista_bloq = {NULL, NULL};
 
 /*
+ * Variable global que representa la cola de procesos bloqueados esperando a crear un mutex
+ */
+lista_BCPs lista_bloq_mutex = {NULL, NULL};
+
+/*
  * Variable global que guarda el numero de interrupciones de reloj totales
 */
 
@@ -111,6 +122,31 @@ typedef struct tiempos_ejec_t {
     int sistema;
 } tiempos_ejec;
 
+/* 
+ * Definicion sistema de MUTEX 
+ */
+
+#define LOCKED 0
+#define SIN_USAR 1
+#define UNLOCKED 2
+
+typedef struct mutex_t {
+	char nombre[MAX_NOM_MUT]; //nombre 
+	int tipo;	//Recursivo o no recursivo
+	int estado; // estado libre o bloqueado
+	int id; // id del mutex
+	int owner; // proceso que tiene el mutex
+	int n_blocks; // nº de veces que un proceso ha bloqueado dicho mutex
+	int n_opens; // contador de procesos que tienen abierto el mutex
+	lista_BCPs procesos_esperando; //procesos bloqueados
+} mutex;
+
+mutex tabla_mutex[NUM_MUT]; // variable global que representa todos los mutex del sistema
+
+int n_mutex_open; // numero de mutex abiertos actualmente
+
+
+
 /*
  * Prototipos de las rutinas que realizan cada llamada al sistema
  */
@@ -120,7 +156,11 @@ int sis_escribir();
 int sis_obtener_id_pr();
 int sis_dormir();
 int sis_tiempos_proceso();
-
+int sis_crear_mutex();
+int sis_abrir_mutex();
+int sis_lock();
+int sis_unlock();
+int sis_cerrar_mutex();
 /*
  * Variable global que contiene las rutinas que realizan cada llamada
  */
@@ -130,6 +170,11 @@ servicio tabla_servicios[NSERVICIOS] = {
 	{sis_escribir},
 	{sis_obtener_id_pr},
 	{sis_dormir},
-	{sis_tiempos_proceso}};
+	{sis_tiempos_proceso},
+	{sis_crear_mutex},
+	{sis_abrir_mutex},
+	{sis_lock},
+	{sis_unlock},
+	{sis_cerrar_mutex}};
 
 #endif /* _KERNEL_H */
