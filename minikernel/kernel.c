@@ -199,7 +199,7 @@ void desbloquear_proc_esperando(lista_BCPs *lista_bloqueos)
 }
 
 // Funcion que libera todos los mutex del proceso actual.
-// Se llama antes de liberar un proceso
+// Se llama al liberar un proceso
 void liberar_mutex()
 {
 	int i, descriptor;
@@ -226,7 +226,7 @@ void liberar_mutex()
 			mut->n_opens--;
 
 			// si no hay nadie con el mutex abierto se elimina definitivamente
-			if (mut->n_opens == 0)
+			if (mut->n_opens <= 0)
 			{
 				tabla_mutex[descriptor].estado = SIN_USAR;
 				n_mutex_open--;
@@ -885,7 +885,7 @@ int sis_cerrar_mutex()
 	}
 
 	// si no hay nadie con el mutex abierto se elimina definitivamente
-	if (mut->n_opens == 0)
+	if (mut->n_opens <= 0)
 	{
 		mut->estado = SIN_USAR;
 		n_mutex_open--;
