@@ -47,6 +47,7 @@ typedef struct BCP_t
 	int int_usuario;		  /* veces que ha habido interrupcion de reloj en modo usuario*/
 	int int_sistema;          /* veces que ha habido interrupcion de reloj en modo sistema*/
 	int desc_mutex[NUM_MUT_PROC]; /* lista con los descriptores de mutex del proceso, -1 por defecto en cada posicion */
+	int ticks_rodaja_restantes; /*ticks restantes que tiene para completar su rodaja*/ 
 } BCP;
 
 /*
@@ -101,6 +102,12 @@ long num_ints = 0;
 */
 
 int acceso_parametro = 0;
+
+/*
+* Variable global que registra el id del proceso que se pretende expulsar con int. sw.
+*/
+
+int proc_a_expulsar;
 
 /*
  *

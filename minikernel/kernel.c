@@ -15,11 +15,9 @@
 
 #include "kernel.h" /* Contiene defs. usadas por este modulo */
 
-/*
- *
+/****************************************************************************************
  * Funciones relacionadas con la tabla de procesos:
  *	iniciar_tabla_proc buscar_BCP_libre
- *
  */
 
 /*
@@ -46,8 +44,7 @@ static int buscar_BCP_libre()
 	return -1;
 }
 
-/*
- *
+/****************************************************************************************
  * Funciones que facilitan el manejo de las listas de BCPs
  *	insertar_ultimo eliminar_primero eliminar_elem
  *
@@ -101,10 +98,11 @@ static void eliminar_elem(lista_BCPs *lista, BCP *proc)
 	}
 }
 
-/*
- *
+/****************************************************************************************
  * Funciones relacionadas con la tabla de mutex:
- *
+ * iniciar_tabla_mutex, buscar_mutex_libre, buscar_nombre_mutex
+ * find_mutex_descrp, get_free_mutex_descrp, get_open_mutex
+ * desbloquear_proc_esperando, liberar_mutex
  */
 
 /*
@@ -200,7 +198,8 @@ void desbloquear_proc_esperando(lista_BCPs *lista_bloqueos)
 	}
 }
 
-// Funcion que libera todos los mutex del proceso actual
+// Funcion que libera todos los mutex del proceso actual.
+// Se llama antes de liberar un proceso
 void liberar_mutex()
 {
 	int i, descriptor;
@@ -239,8 +238,7 @@ void liberar_mutex()
 	}
 }
 
-/*
- *
+/****************************************************************************************
  * Funciones relacionadas con la planificacion
  *	espera_int planificador
  */
@@ -267,11 +265,13 @@ static BCP *planificador()
 {
 	while (lista_listos.primero == NULL)
 		espera_int(); /* No hay nada que hacer */
+
+	// le asignamos los ticks que tiene por rodaja
+	lista_listos.primero->ticks_rodaja_restantes = TICKS_POR_RODAJA;
 	return lista_listos.primero;
 }
 
-/*
- *
+/****************************************************************************************
  * Funcion auxiliar que termina proceso actual liberando sus recursos.
  * Usada por llamada terminar_proceso y por rutinas que tratan excepciones
  *
@@ -301,8 +301,7 @@ static void liberar_proceso()
 	return; /* no deber�a llegar aqui */
 }
 
-/*
- *
+/****************************************************************************************
  * Funciones relacionadas con el tratamiento de interrupciones
  *	excepciones: exc_arit exc_mem
  *	interrupciones de reloj: int_reloj
@@ -363,9 +362,10 @@ static void int_reloj()
 	num_ints += 1;
 	printk("-> TRATANDO INT. DE RELOJ\n");
 
-	// contabilizamos si ha ocurrido en modo usuario o modo sistema, siempre que haya al menos un proceso listo
+	// si hay al menos un proceso listo
 	if (lista_listos.primero != NULL)
 	{
+		// contabilizamos si ha ocurrido en modo usuario o modo sistema
 		if (viene_de_modo_usuario())
 		{
 			p_proc_actual->int_usuario++;
@@ -373,6 +373,16 @@ static void int_reloj()
 		else
 		{
 			p_proc_actual->int_sistema++;
+		}
+
+		// contabilizamos gasto de rodaja
+		p_proc_actual->ticks_rodaja_restantes--;
+		// si ha llegado al final de su rodaja se activa una interrupcion software
+		if (p_proc_actual->ticks_rodaja_restantes <= 0)
+		{
+			// guardamos referencia al proceso que queremos expulsar
+			proc_a_expulsar = p_proc_actual->id;
+			activar_int_SW();
 		}
 	}
 
@@ -427,14 +437,30 @@ static void tratar_llamsis()
  */
 static void int_sw()
 {
+	BCP *proc_expulsado;
+	int nivel_previo;
 
 	printk("-> TRATANDO INT. SW\n");
+
+	// comprobamos que el proceso a expulsar no ha terminado
+	if (p_proc_actual->id == proc_a_expulsar)
+	{
+		proc_expulsado = p_proc_actual;
+		nivel_previo = fijar_nivel_int(NIVEL_3);
+		// eliminamos al proceso de la lista de listos
+		eliminar_elem(&lista_listos, proc_expulsado);
+		// lo añadimos a la lista de listos
+		insertar_ultimo(&lista_listos, proc_expulsado);
+		fijar_nivel_int(nivel_previo);
+
+		p_proc_actual = planificador();
+		cambio_contexto(&proc_expulsado->contexto_regs, &p_proc_actual->contexto_regs);
+	}
 
 	return;
 }
 
-/*
- *
+/****************************************************************************************
  * Funcion auxiliar que crea un proceso reservando sus recursos.
  * Usada por llamada crear_proceso.
  *
@@ -485,8 +511,7 @@ static int crear_tarea(char *prog)
 	return error;
 }
 
-/*
- *
+/****************************************************************************************
  * Rutinas que llevan a cabo las llamadas al sistema
  *	sis_crear_proceso sis_escribir
  *
@@ -872,8 +897,7 @@ int sis_cerrar_mutex()
 	return 0;
 }
 
-/*
- *
+/****************************************************************************************
  * Rutina de inicializaci�n invocada en arranque
  *
  */
