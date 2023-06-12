@@ -351,6 +351,15 @@ static void int_terminal()
 	car = leer_puerto(DIR_TERMINAL);
 	printk("-> TRATANDO INT. DE TERMINAL %c\n", car);
 
+	// si el buffer esta completo se ignora el caracter nuevo
+	if (contCaracteres < TAM_BUF_TERM)
+	{
+		bufferTerminal[contCaracteres] = car;
+		contCaracteres++;
+
+		// desbloqueamos a un proceso si estaba bloqueado esperando caracteres que leer
+		desbloquear_proc_esperando(&lista_bloq_lectura);
+	}
 	return;
 }
 
@@ -509,6 +518,36 @@ static int crear_tarea(char *prog)
 		error = -1; /* fallo al crear imagen */
 
 	return error;
+}
+
+/****************************************************************************************
+ * Rutinas auxiliares para el tratamiento de caracteres en el buffer de terminal
+ */
+
+int sacar_primer_caracter()
+{
+	int nivel_previo, i;
+	char c;
+
+	// inhibilitamos interrupciones de nivel 2 para que no lleguen caracteres entre medias
+	nivel_previo = fijar_nivel_int(NIVEL_2);
+
+	c = bufferTerminal[0];
+
+	// lo eliminamos del buffer
+	for (i = 0; i < contCaracteres - 1; i++)
+	{
+		bufferTerminal[i] = bufferTerminal[i+1];
+	}
+
+	// restamos 1 al contadores de caracteres en bufffer
+	contCaracteres--;
+
+	// volvemos a activar interrupciones
+	fijar_nivel_int(nivel_previo);
+
+	// devolvemos caracter
+	return c;
 }
 
 /****************************************************************************************
@@ -895,6 +934,34 @@ int sis_cerrar_mutex()
 	}
 
 	return 0;
+}
+
+/* entrada por teclado */
+
+int sis_leer_caracter()
+{
+	int nivel_previo;
+	BCP *proc_bloqueado;
+
+	// mientras no haya caracteres por leer se bloquea
+	while (contCaracteres == 0)
+	{
+		p_proc_actual->estado = BLOQUEADO;
+		// quitamos todas las interrupciones
+		nivel_previo = fijar_nivel_int(NIVEL_3);
+		eliminar_elem(&lista_listos, p_proc_actual);
+		insertar_ultimo(&lista_bloq_lectura, p_proc_actual);
+		// activamos interrupciones
+		fijar_nivel_int(nivel_previo);
+
+		proc_bloqueado = p_proc_actual;
+		// siguiente proceso
+		p_proc_actual = planificador();
+		cambio_contexto(&proc_bloqueado->contexto_regs, &p_proc_actual->contexto_regs);
+	}
+
+	// sacamos el primer caracter del buffer
+	return sacar_primer_caracter();
 }
 
 /****************************************************************************************

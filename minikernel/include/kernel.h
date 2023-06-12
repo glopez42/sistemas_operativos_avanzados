@@ -82,7 +82,7 @@ BCP tabla_procs[MAX_PROC];
 lista_BCPs lista_listos = {NULL, NULL};
 
 /*
- * Variable global que representa la cola de procesos bloqueados
+ * Variable global que representa la cola de procesos dormidos
  */
 lista_BCPs lista_bloq = {NULL, NULL};
 
@@ -90,6 +90,12 @@ lista_BCPs lista_bloq = {NULL, NULL};
  * Variable global que representa la cola de procesos bloqueados esperando a crear un mutex
  */
 lista_BCPs lista_bloq_mutex = {NULL, NULL};
+
+/*
+ * Variable global que representa la cola de procesos bloqueados esperando a leer un caracter
+ */
+lista_BCPs lista_bloq_lectura = {NULL, NULL};
+
 
 /*
  * Variable global que guarda el numero de interrupciones de reloj totales
@@ -152,6 +158,12 @@ mutex tabla_mutex[NUM_MUT]; // variable global que representa todos los mutex de
 
 int n_mutex_open; // numero de mutex abiertos actualmente
 
+/*
+* Buffer de caracteres asociado al terminal
+*/
+char bufferTerminal[TAM_BUF_TERM];
+
+int contCaracteres = 0; // contador de caracteres en el buffer
 
 
 /*
@@ -168,6 +180,8 @@ int sis_abrir_mutex();
 int sis_lock();
 int sis_unlock();
 int sis_cerrar_mutex();
+int sis_leer_caracter();
+
 /*
  * Variable global que contiene las rutinas que realizan cada llamada
  */
@@ -182,6 +196,7 @@ servicio tabla_servicios[NSERVICIOS] = {
 	{sis_abrir_mutex},
 	{sis_lock},
 	{sis_unlock},
-	{sis_cerrar_mutex}};
+	{sis_cerrar_mutex},
+	{sis_leer_caracter}};
 
 #endif /* _KERNEL_H */
