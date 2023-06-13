@@ -738,7 +738,7 @@ int sis_crear_mutex()
 	// le asignamos la posicion de la tabla al descriptor libre del proceso actual
 	p_proc_actual->desc_mutex[descriptor] = pos;
 
-	return descriptor;
+	return pos;
 }
 
 int sis_abrir_mutex()
